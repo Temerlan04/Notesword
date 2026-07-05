@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дневник</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f2ed; --surface: #faf8f5; --border: #e0dbd3;
+  --border-soft: #ece8e2; --text: #1a1814; --text-muted: #8c8680;
+  --text-faint: #b8b3ac; --r: 14px; --r-sm: 8px;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 18px; -webkit-font-smoothing: antialiased; }
+
+.screen { display: none; }
+.screen.active { display: flex; flex-direction: column; height: 100vh; overflow-y: auto; }
+
+/* ── CHOOSE ── */
+#screen-choose { align-items: center; justify-content: center; padding: 3rem 2rem; }
+.choose-wrap { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 2.5rem; }
+.choose-title { font-family: 'Instrument Serif', serif; font-size: 4rem; font-weight: 400; letter-spacing: -0.02em; line-height: 1; }
+.choose-sub { font-size: 0.95rem; color: var(--text-faint); font-weight: 300; margin-top: 0.4rem; }
+.choose-btns { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+.choose-btn {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 1.5rem 2rem; cursor: pointer; text-align: left;
+  transition: border-color 0.15s, transform 0.1s;
+  display: flex; align-items: center; gap: 1.2rem;
+}
+.choose-btn:hover { border-color: var(--text); transform: translateY(-1px); }
+.choose-btn-icon { font-size: 1.4rem; line-height: 1; color: var(--text-faint); }
+.choose-btn-label { font-size: 1.1rem; font-weight: 500; }
+.choose-btn-sub { font-size: 0.85rem; color: var(--text-muted); font-weight: 300; margin-top: 2px; }
+
+/* ── NOTES LIST ── */
+#screen-notes { padding: 0; }
+.list-header { padding: 2rem 3rem 1.5rem; display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid var(--border-soft); }
+.back-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-faint);
+  font-size: 1.3rem; padding: 4px 8px; border-radius: var(--r-sm);
+  transition: color 0.1s, background 0.1s; line-height: 1;
+}
+.back-btn:hover { color: var(--text); background: var(--border-soft); }
+.list-title { font-family: 'Instrument Serif', serif; font-size: 1.8rem; font-weight: 400; }
+.notes-grid { padding: 2rem 3rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.note-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 1.4rem 1.6rem; cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  display: flex; flex-direction: column; min-height: 110px;
+}
+.note-card:hover { border-color: var(--text); transform: translateY(-2px); }
+.note-card-title { font-size: 1rem; font-weight: 500; flex: 1; margin-bottom: 0.8rem; }
+.note-card-preview { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.8rem; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.note-card-date { font-size: 0.75rem; color: var(--text-faint); font-weight: 300; }
+.empty-state { padding: 5rem 3rem; text-align: center; color: var(--text-faint); font-size: 0.95rem; font-weight: 300; }
+.fab {
+  position: fixed; bottom: 2.5rem; right: 2.5rem;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--text); color: var(--bg); border: none; cursor: pointer;
+  font-size: 1.8rem; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.fab:hover { transform: scale(1.08); }
+
+/* ── NOTE EDITOR ── */
+.note-top {
+  padding: 1.8rem 3rem 1.4rem; border-bottom: 1px solid var(--border-soft);
+  display: flex; align-items: center; gap: 1rem;
+  position: sticky; top: 0; z-index: 10;
+  background: var(--bg);
+}
+.note-title-input {
+  flex: 1; font-family: 'Instrument Serif', serif; font-size: 1.9rem; font-weight: 400;
+  border: none; background: transparent; color: var(--text); outline: none;
+}
+.note-title-input::placeholder { color: var(--text-faint); }
+.icon-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-faint);
+  padding: 6px; border-radius: var(--r-sm); line-height: 1;
+  display: flex; align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.icon-btn:hover { color: var(--text-muted); background: var(--border-soft); }
+.icon-btn.danger:hover { color: #b83232; background: #fdf0f0; }
+
+.blocks-area { padding: 1.5rem 3rem 2rem; flex: 1; }
+
+/* ── BLOCK ── */
+.block-item {
+  position: relative; display: flex; align-items: flex-start;
+  gap: 4px; margin: 1px 0; border-radius: 6px; min-width: 0;
+}
+.block-item:hover { background: rgba(0,0,0,0.02); }
+.block-item:hover .block-handle,
+.block-item:hover .block-del { opacity: 1; }
+
+.block-handle {
+  opacity: 0; color: var(--text-faint); font-size: 12px;
+  cursor: grab; padding: 9px 2px 0; user-select: none;
+  flex-shrink: 0; transition: opacity 0.12s;
+}
+.block-handle:active { cursor: grabbing; }
+
+.block-bullet { color: var(--text-faint); font-size: 8px; padding-top: 12px; min-width: 12px; flex-shrink: 0; user-select: none; cursor: text; }
+
+.block-del {
+  opacity: 0; background: none; border: none; cursor: pointer;
+  color: var(--text-faint); font-size: 10px; padding: 9px 4px 0;
+  line-height: 1; flex-shrink: 0; transition: opacity 0.12s, color 0.1s;
+}
+.block-del:hover { color: #b83232; opacity: 1 !important; }
+
+.block-item.ind-1 { padding-left: 1.8rem; }
+.block-item.ind-2 { padding-left: 3.6rem; }
+
+.block-text {
+  flex: 1; font-size: 1.05rem; font-family: 'DM Sans', sans-serif; font-weight: 300;
+  color: var(--text); border: none; background: transparent; outline: none;
+  line-height: 1.8; min-height: 36px; padding: 4px 0;
+  width: 100%; word-break: break-word; white-space: pre-wrap;
+}
+.block-text::placeholder { color: var(--text-faint); }
+.block-text b, .block-text strong { font-weight: 600; }
+.block-text .mark-red { color: #c0392b; font-weight: 400; }
+[contenteditable]:empty:before { content: attr(data-placeholder); color: var(--text-faint); pointer-events: none; }
+
+/* ── IMAGE BLOCK ── */
+.img-block-inner { flex: 1; padding: 4px 0; min-width: 0; }
+.img-block-inner::after { content: ''; display: table; clear: both; }
+
+.img-container {
+  position: relative; display: inline-block;
+  border-radius: 10px; overflow: visible; cursor: default;
+  max-width: 65%; min-width: 60px;
+}
+.img-container img { display: block; border-radius: 10px; width: 100%; height: auto; }
+
+.img-align-left  .img-container { float: left;  margin: 2px 18px 10px 0; }
+.img-align-right .img-container { float: right; margin: 2px 0 10px 18px; }
+.img-align-center .img-container { float: none; display: block; margin: 0 auto; }
+
+/* center mode: 3-column grid */
+.img-align-center { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(120px, 40%) minmax(160px, 1fr); gap: 20px; align-items: start; }
+.img-align-center::after { display: none; }
+.img-align-center .img-container { grid-column: 2; max-width: 100%; float: none; margin: 0 auto; }
+.img-align-center .img-inline-text-left  { grid-column: 1; grid-row: 1; }
+.img-align-center .img-inline-text-right { grid-column: 3; grid-row: 1; }
+.img-align-center .img-inline-text { display: none; }
+
+.img-inline-text {
+  font-size: 1.05rem; font-family: 'DM Sans', sans-serif; font-weight: 300;
+  color: var(--text); border: none; background: transparent; outline: none;
+  line-height: 1.8; min-height: 80px; padding: 4px 0;
+  width: 100%; display: block; white-space: pre-wrap; word-break: break-word; cursor: text;
+}
+.img-inline-text:empty::before { content: attr(data-placeholder); color: var(--text-faint); pointer-events: none; }
+.img-inline-text-left, .img-inline-text-right {
+  font-size: 1.05rem; font-family: 'DM Sans', sans-serif; font-weight: 300;
+  color: var(--text); border: none; background: transparent; outline: none;
+  line-height: 1.8; min-height: 80px; padding: 4px 0;
+  display: block; white-space: pre-wrap; word-break: break-word; cursor: text;
+  width: 100%;
+}
+.img-inline-text-left:empty::before { content: 'Текст слева...'; color: var(--text-faint); pointer-events: none; }
+.img-inline-text-right:empty::before { content: 'Текст справа...'; color: var(--text-faint); pointer-events: none; }
+
+/* image toolbar */
+.img-toolbar {
+  display: none; position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 3px 5px; gap: 1px; align-items: center; white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08); z-index: 10;
+}
+.img-container:hover .img-toolbar { display: flex; }
+.img-toolbar-sep { width: 1px; height: 14px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
+.itb {
+  background: none; border: none; cursor: pointer; border-radius: 5px;
+  padding: 4px 8px; font-size: 11px; font-family: 'DM Sans', sans-serif;
+  color: var(--text-muted); display: flex; align-items: center; gap: 3px;
+  transition: background 0.1s, color 0.1s; white-space: nowrap;
+}
+.itb:hover, .itb.active { background: var(--border-soft); color: var(--text); }
+.itb.active { font-weight: 500; }
+
+/* resize handle */
+.img-resize-handle {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 5px; height: 40px; background: var(--text);
+  border-radius: 4px; cursor: ew-resize;
+  opacity: 0; transition: opacity 0.15s; z-index: 20;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+}
+.img-resize-handle { right: -10px; }
+.img-container:hover .img-resize-handle,
+.img-container.resizing .img-resize-handle { opacity: 0.85; }
+
+/* footer & hint */
+.note-footer { padding: 0.5rem 3rem 1.5rem; font-size: 0.75rem; color: var(--text-faint); font-weight: 300; }
+.hint { font-size: 0.75rem; color: var(--text-faint); padding: 0.8rem 0 0 18px; font-weight: 300; letter-spacing: 0.01em; }
+
+#img-input { display: none; }
+
+/* ── SUBNOTES ── */
+.subnote-list {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  padding: 1.5rem 3rem 0.5rem; border-top: 1px solid var(--border-soft);
+}
+.subnote-list-label {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-faint); font-weight: 400; margin-bottom: 0.4rem;
+}
+.subnote-card {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0.9rem; border-radius: var(--r-sm);
+  cursor: pointer; transition: background 0.12s;
+  color: var(--text-muted);
+}
+.subnote-card:hover { background: var(--border-soft); color: var(--text); }
+.subnote-card-title { flex: 1; font-size: 0.92rem; font-weight: 300; }
+.subnote-card-arrow { font-size: 0.75rem; color: var(--text-faint); }
+
+/* breadcrumb in note-top */
+.note-breadcrumb {
+  flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0;
+}
+.note-breadcrumb-trail {
+  font-size: 0.7rem; color: var(--text-faint); font-weight: 300;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; transition: color 0.12s;
+}
+.note-breadcrumb-trail:hover { color: var(--text-muted); }
+
+/* ── DELETE MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(26,24,20,0.18);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s;
+}
+.modal-overlay.visible { opacity: 1; pointer-events: all; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 2rem 2.2rem 1.6rem;
+  width: 100%; max-width: 340px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+  transform: translateY(6px); transition: transform 0.18s;
+}
+.modal-overlay.visible .modal-box { transform: translateY(0); }
+.modal-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #fdf0f0; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 1rem; color: #b83232;
+}
+.modal-title { font-family: 'Instrument Serif', serif; font-size: 1.25rem; font-weight: 400; margin-bottom: 0.4rem; }
+.modal-sub { font-size: 0.85rem; color: var(--text-muted); font-weight: 300; line-height: 1.5; margin-bottom: 1.6rem; }
+.modal-btns { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.modal-btn {
+  font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 400;
+  border-radius: var(--r-sm); padding: 0.55rem 1.2rem; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-muted); transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.modal-btn:hover { background: var(--border-soft); color: var(--text); }
+.modal-btn.danger {
+  background: #fdf0f0; border-color: #e8c0c0; color: #b83232;
+}
+.modal-btn.danger:hover { background: #f9e0e0; border-color: #b83232; }
+
+/* ── BG DECO ── */
+.bg-deco {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+}
+#screen-choose .choose-wrap { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="screen-choose" class="screen active">
+    <svg class="bg-deco" viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <!-- scattered minimal botanical / geometric marks -->
+      <!-- top-left: small leaf sprig -->
+      <g opacity="0.13" stroke="#6b6459" fill="none" stroke-width="1">
+        <path d="M60 80 Q75 55 95 70" stroke-linecap="round"/>
+        <path d="M60 80 Q50 60 70 50" stroke-linecap="round"/>
+        <line x1="60" y1="80" x2="60" y2="110" stroke-linecap="round"/>
+      </g>
+      <!-- top-right: tiny circle ring -->
+      <circle cx="920" cy="90" r="28" stroke="#6b6459" stroke-width="0.8" fill="none" opacity="0.1"/>
+      <circle cx="920" cy="90" r="18" stroke="#6b6459" stroke-width="0.5" fill="none" opacity="0.08"/>
+      <!-- bottom-left: cross mark -->
+      <g opacity="0.1" stroke="#6b6459" stroke-width="0.9" stroke-linecap="round">
+        <line x1="80" y1="600" x2="80" y2="630"/>
+        <line x1="65" y1="615" x2="95" y2="615"/>
+      </g>
+      <!-- bottom-right: small branch -->
+      <g opacity="0.12" stroke="#6b6459" fill="none" stroke-width="1" stroke-linecap="round">
+        <line x1="900" y1="620" x2="900" y2="580"/>
+        <path d="M900 610 Q918 598 925 585"/>
+        <path d="M900 600 Q882 590 876 578"/>
+        <path d="M900 590 Q914 580 918 568"/>
+      </g>
+      <!-- center-top: faint long horizontal rule -->
+      <line x1="350" y1="38" x2="650" y2="38" stroke="#6b6459" stroke-width="0.6" opacity="0.09"/>
+      <!-- center-bottom: faint long horizontal rule -->
+      <line x1="350" y1="662" x2="650" y2="662" stroke="#6b6459" stroke-width="0.6" opacity="0.09"/>
+      <!-- mid-left: small diamond -->
+      <g opacity="0.09" stroke="#6b6459" stroke-width="0.8" fill="none">
+        <polygon points="30,340 42,352 30,364 18,352"/>
+      </g>
+      <!-- mid-right: three tiny dots -->
+      <g opacity="0.12" fill="#6b6459">
+        <circle cx="968" cy="335" r="2"/>
+        <circle cx="968" cy="348" r="2"/>
+        <circle cx="968" cy="361" r="2"/>
+      </g>
+    </svg>
+    <div class="choose-wrap">
+      <div style="text-align:center">
+        <div class="choose-title">дневник</div>
+        <div class="choose-sub">выберите раздел</div>
+      </div>
+      <div class="choose-btns">
+        <button class="choose-btn" onclick="openSection('personal')">
+          <span class="choose-btn-icon">◯</span>
+          <div><div class="choose-btn-label">Личный</div><div class="choose-btn-sub">мысли, идеи, жизнь</div></div>
+        </button>
+        <button class="choose-btn" onclick="openSection('work')">
+          <span class="choose-btn-icon">◻</span>
+          <div><div class="choose-btn-label">Работа</div><div class="choose-btn-sub">задачи, проекты, встречи</div></div>
+        </button>
+        <button class="choose-btn" onclick="openSection('study')">
+          <span class="choose-btn-icon">△</span>
+          <div><div class="choose-btn-label">Учёба</div><div class="choose-btn-sub">конспекты, предметы, материалы</div></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-notes" class="screen">
+    <div class="list-header">
+      <button class="back-btn" onclick="goBack()">←</button>
+      <h2 class="list-title" id="section-label"></h2>
+    </div>
+    <div id="notes-grid" class="notes-grid"></div>
+    <div id="notes-empty" class="empty-state" style="display:none">Нет заметок — нажмите +</div>
+    <button class="fab" onclick="createNote()">+</button>
+  </div>
+
+  <div id="screen-note" class="screen">
+    <div class="note-top">
+      <button class="back-btn" onclick="noteGoBack()">←</button>
+      <div class="note-breadcrumb">
+        <div id="note-breadcrumb-trail" class="note-breadcrumb-trail" style="display:none" onclick="noteGoBack()"></div>
+        <input id="note-title" class="note-title-input" placeholder="Без названия" oninput="saveNote()">
+      </div>
+      <button class="icon-btn" onclick="triggerImagePick()" title="Добавить картинку">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      </button>
+      <button class="icon-btn" onclick="createSubnote()" title="Добавить подзаметку">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      </button>
+      <button class="icon-btn danger" onclick="deleteNote()" title="Удалить заметку">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
+    </div>
+    <div id="blocks-area" class="blocks-area">
+      <div id="blocks"></div>
+      <div class="hint">Enter — новый блок &nbsp;·&nbsp; Tab — подпункт</div>
+      <div id="subnotes-list" class="subnote-list" style="display:none"></div>
+    </div>
+    <div id="note-footer" class="note-footer"></div>
+  </div>
+
+  <!-- subtle deco for notes screens -->
+  <svg id="notes-deco" style="position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;width:100%;height:100%" viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+    <g opacity="0.07" stroke="#6b6459" fill="none" stroke-width="1" stroke-linecap="round">
+      <!-- top-right sprig -->
+      <line x1="940" y1="30" x2="940" y2="75"/>
+      <path d="M940 60 Q958 48 963 35"/>
+      <path d="M940 50 Q922 40 918 28"/>
+    </g>
+    <!-- bottom-left small arc -->
+    <path d="M20 680 Q45 650 70 670" stroke="#6b6459" stroke-width="0.8" fill="none" opacity="0.08" stroke-linecap="round"/>
+    <!-- bottom-right dot cluster -->
+    <g opacity="0.1" fill="#6b6459">
+      <circle cx="955" cy="660" r="1.8"/>
+      <circle cx="965" cy="655" r="1.2"/>
+      <circle cx="962" cy="668" r="1.5"/>
+    </g>
+    <!-- top-left thin L-bracket -->
+    <g opacity="0.08" stroke="#6b6459" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="22" y1="40" x2="22" y2="18"/>
+      <line x1="22" y1="18" x2="44" y2="18"/>
+    </g>
+  </svg>
+
+  <!-- delete modal -->
+  <div id="delete-modal" class="modal-overlay" onclick="closeDeleteModal(event)">
+    <div class="modal-box">
+      <div class="modal-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </div>
+      <div class="modal-title">Удалить заметку?</div>
+      <div class="modal-sub" id="delete-modal-sub">Это действие нельзя отменить.</div>
+      <div class="modal-btns">
+        <button class="modal-btn" onclick="closeDeleteModal()">Отмена</button>
+        <button class="modal-btn danger" onclick="confirmDelete()">Удалить</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<input type="file" id="img-input" accept="image/*" onchange="insertImage(event)">
+
+<script>
+function loadState() {
+  try {
+    const saved = localStorage.getItem('dnevnik_notes');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return { personal: [], work: [], study: [] };
+}
+function persistNotes() {
+  try { localStorage.setItem('dnevnik_notes', JSON.stringify(state.notes)); } catch(e) {}
+}
+const state = { section: null, notes: loadState(), currentNote: null, lastFocusedId: null };
+
+const fmt = ts => {
+  const d = new Date(ts);
+  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'}) + ', ' + d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+};
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function openSection(sec) {
+  state.section = sec;
+  document.getElementById('section-label').textContent = sec === 'personal' ? 'Личный' : sec === 'work' ? 'Работа' : 'Учёба';
+  renderNotes();
+  show('screen-notes');
+}
+
+function goBack() { show('screen-choose'); }
+
+// navStack: array of note ids from root to current parent
+// e.g. [] = top-level, ['abc'] = inside note abc, ['abc','def'] = inside abc > def
+if (!state.navStack) state.navStack = [];
+
+function findNoteInTree(id, list) {
+  for (const n of list) {
+    if (n.id === id) return n;
+    if (n.subnotes) { const found = findNoteInTree(id, n.subnotes); if (found) return found; }
+  }
+  return null;
+}
+
+function getNote() {
+  return findNoteInTree(state.currentNote, state.notes[state.section]);
+}
+
+function getParentNote() {
+  if (!state.navStack || !state.navStack.length) return null;
+  const parentId = state.navStack[state.navStack.length - 1];
+  return findNoteInTree(parentId, state.notes[state.section]);
+}
+
+function bid() { return Math.random().toString(36).slice(2,9); }
+
+function getPreview(note) {
+  return note.blocks.filter(b => b.type === 'text').map(b => b.text || (b.html ? b.html.replace(/<[^>]+>/g,'') : '')).filter(Boolean).join(' · ').slice(0,80);
+}
+
+function renderNotes() {
+  const grid = document.getElementById('notes-grid');
+  const empty = document.getElementById('notes-empty');
+  const notes = state.notes[state.section];
+  grid.innerHTML = '';
+  if (!notes.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  notes.slice().sort((a,b) => b.updated - a.updated).forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'note-card';
+    const prev = getPreview(n);
+    el.innerHTML = `<div class="note-card-title">${n.title||'Без названия'}</div>${prev?`<div class="note-card-preview">${prev}</div>`:''}<div class="note-card-date">${fmt(n.updated)}</div>`;
+    el.onclick = () => { state.navStack = []; openNote(n.id); };
+    grid.appendChild(el);
+  });
+}
+
+function createNote() {
+  state.navStack = [];
+  const id = Date.now().toString();
+  state.notes[state.section].push({ id, title: '', blocks: [{id:bid(),type:'text',text:'',indent:0}], updated: Date.now(), subnotes: [] });
+  openNote(id);
+}
+
+function openNote(id, pushToStack) {
+  // pushToStack: id of the note we're navigating INTO from (its parent)
+  if (pushToStack !== undefined) {
+    if (!state.navStack) state.navStack = [];
+    state.navStack.push(pushToStack);
+  }
+  state.currentNote = id;
+  state.lastFocusedId = null;
+  const note = getNote();
+  const parent = getParentNote();
+
+  document.getElementById('note-title').value = note.title;
+
+  // breadcrumb trail
+  const trail = document.getElementById('note-breadcrumb-trail');
+  if (state.navStack && state.navStack.length) {
+    // build trail text from stack
+    const parts = state.navStack.map(sid => {
+      const n = findNoteInTree(sid, state.notes[state.section]);
+      return n ? (n.title || 'Без названия') : '';
+    }).filter(Boolean);
+    trail.style.display = 'block';
+    trail.textContent = parts.join(' › ');
+  } else {
+    trail.style.display = 'none';
+  }
+
+  renderSubnotes(note);
+  renderBlocks(); updateFooter(); show('screen-note');
+  setTimeout(() => {
+    if (!note.title) document.getElementById('note-title').focus();
+    else focusBlock(note.blocks[0].id);
+  }, 60);
+}
+
+function noteGoBack() {
+  if (state.navStack && state.navStack.length) {
+    const parentId = state.navStack.pop();
+    state.currentNote = parentId;
+    openNote(parentId);
+  } else {
+    goToNotes();
+  }
+}
+
+function goToNotes() {
+  state.navStack = [];
+  renderNotes(); show('screen-notes');
+}
+
+function renderSubnotes(note) {
+  if (!note.subnotes) note.subnotes = [];
+  const list = document.getElementById('subnotes-list');
+  list.innerHTML = '';
+  if (!note.subnotes.length) { list.style.display = 'none'; return; }
+  list.style.display = 'flex';
+  const label = document.createElement('div');
+  label.className = 'subnote-list-label'; label.textContent = 'Подзаметки';
+  list.appendChild(label);
+  note.subnotes.forEach(sub => {
+    const card = document.createElement('div');
+    card.className = 'subnote-card';
+    card.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="flex-shrink:0;opacity:.45"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="subnote-card-title">${sub.title || 'Без названия'}</span><span class="subnote-card-arrow">›</span>`;
+    card.onclick = () => openNote(sub.id, state.currentNote);
+    list.appendChild(card);
+  });
+}
+
+function createSubnote() {
+  const currentId = state.currentNote;
+  const note = getNote();
+  if (!note.subnotes) note.subnotes = [];
+  const sub = { id: bid(), title: '', blocks: [{id:bid(),type:'text',text:'',indent:0}], updated: Date.now(), subnotes: [] };
+  note.subnotes.push(sub);
+  persistNotes();
+  openNote(sub.id, currentId);
+}
+
+function deleteNote() {
+  const note = getNote();
+  const name = note && note.title ? '«' + note.title + '»' : 'эту заметку';
+  document.getElementById('delete-modal-sub').textContent = 'Удалить ' + name + '? Это действие нельзя отменить.';
+  document.getElementById('delete-modal').classList.add('visible');
+}
+function closeDeleteModal(e) {
+  if (e && e.target !== document.getElementById('delete-modal')) return;
+  document.getElementById('delete-modal').classList.remove('visible');
+}
+function confirmDelete() {
+  document.getElementById('delete-modal').classList.remove('visible');
+  const parent = getParentNote();
+  if (parent) {
+    parent.subnotes = parent.subnotes.filter(s => s.id !== state.currentNote);
+    persistNotes();
+    state.navStack.pop();
+    openNote(parent.id);
+  } else {
+    state.notes[state.section] = state.notes[state.section].filter(n => n.id !== state.currentNote);
+    persistNotes();
+    goToNotes();
+  }
+}
+
+function saveNote() {
+  const n = getNote(); if (!n) return;
+  n.title = document.getElementById('note-title').value;
+  n.updated = Date.now();
+  updateFooter();
+  persistNotes();
+  renderSubnotes(n);
+}
+
+function updateFooter() {
+  const n = getNote(); if (!n) return;
+  document.getElementById('note-footer').textContent = 'Обновлено ' + fmt(n.updated);
+}
+
+/* ── IMAGE ── */
+function triggerImagePick() { document.getElementById('img-input').click(); }
+
+function insertImageFromFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const note = getNote(); if (!note) return;
+    const imgB = { id: bid(), type: 'image', src: ev.target.result, width: 40, align: 'left', text: '' };
+    let idx = note.blocks.length;
+    if (state.lastFocusedId) {
+      const fi = note.blocks.findIndex(b => b.id === state.lastFocusedId);
+      if (fi >= 0) idx = fi + 1;
+    }
+    note.blocks.splice(idx, 0, imgB);
+    saveNote(); renderBlocks();
+  };
+  reader.readAsDataURL(file);
+}
+
+function insertImage(e) { insertImageFromFile(e.target.files[0]); e.target.value = ''; }
+
+document.addEventListener('paste', e => {
+  if (!state.currentNote) return;
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) {
+      e.preventDefault();
+      insertImageFromFile(items[i].getAsFile());
+      return;
+    }
+  }
+});
+
+/* ── RENDER ── */
+function renderBlocks() {
+  const note = getNote(), cont = document.getElementById('blocks');
+  cont.innerHTML = '';
+  note.blocks.forEach((b,i) => cont.appendChild(b.type === 'image' ? makeImgBlock(b) : makeTxtBlock(b, i === 0)));
+}
+
+function makeImgBlock(b) {
+  const item = document.createElement('div');
+  item.className = 'block-item'; item.dataset.id = b.id;
+
+  const handle = document.createElement('span');
+  handle.className = 'block-handle'; handle.textContent = '⋮⋮';
+
+  const inner = document.createElement('div');
+  inner.className = 'img-block-inner img-align-' + b.align;
+
+  const cont = document.createElement('div');
+  cont.className = 'img-container';
+  if (b.align === 'center' && b.widthPx) {
+    cont.style.width = b.widthPx + 'px';
+  } else {
+    cont.style.width = (b.width || 40) + '%';
+  }
+
+  const img = document.createElement('img');
+  img.src = b.src; img.draggable = false;
+
+  // hover toolbar
+  const tb = document.createElement('div');
+  tb.className = 'img-toolbar';
+
+  [{key:'left',label:'←'},{key:'center',label:'⊙'},{key:'right',label:'→'}].forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'itb' + (b.align === a.key ? ' active' : '');
+    btn.textContent = a.label; btn.title = a.key;
+    btn.onclick = ev => {
+      ev.stopPropagation();
+      applyAlign(a.key);
+      b.align = a.key;
+      tb.querySelectorAll('.itb').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      saveNote();
+    };
+    tb.appendChild(btn);
+  });
+
+  const sep = document.createElement('div'); sep.className = 'img-toolbar-sep';
+  tb.appendChild(sep);
+  const delB = document.createElement('button');
+  delB.className = 'itb'; delB.textContent = '✕';
+  delB.onclick = ev => { ev.stopPropagation(); removeBlock(b.id); };
+  tb.appendChild(delB);
+
+  // resize handle
+  const rh = document.createElement('div');
+  rh.className = 'img-resize-handle';
+  rh.addEventListener('mousedown', ev => {
+    ev.preventDefault();
+    cont.classList.add('resizing');
+    const startX = ev.clientX, startW = cont.offsetWidth;
+    const onMove = e => {
+      const delta = e.clientX - startX;
+      if (b.align === 'center') {
+        // center: resize symmetrically (both sides), so double the delta
+        const newW = Math.max(60, Math.min(inner.querySelector('.img-container') ? inner.getBoundingClientRect().width * 1.5 : 800, startW + delta * 2));
+        cont.style.width = newW + 'px';
+        b.widthPx = Math.round(newW);
+      } else {
+        const parentW = inner.offsetWidth || 600;
+        const newW = Math.max(60, Math.min(parentW, startW + delta));
+        const pct = Math.round(newW / parentW * 100);
+        cont.style.width = pct + '%';
+        b.width = pct;
+      }
+    };
+    const onUp = () => { cont.classList.remove('resizing'); saveNote(); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+
+  cont.appendChild(img); cont.appendChild(tb); cont.appendChild(rh);
+
+  // single text field (left/right mode) — uses b.text
+  const ta = document.createElement('div');
+  ta.className = 'img-inline-text';
+  ta.contentEditable = 'true';
+  ta.dataset.placeholder = 'Текст рядом с картинкой...';
+  ta.textContent = b.text || '';
+  ta.addEventListener('input', () => { b.text = ta.textContent; saveNote(); });
+  ta.addEventListener('focus', () => { state.lastFocusedId = b.id; });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const sel = window.getSelection();
+      if (sel && sel.focusOffset === ta.textContent.length) { e.preventDefault(); addAfter(b.id, 0); }
+    }
+    if (e.key === 'Backspace' && ta.textContent === '') { e.preventDefault(); removeBlock(b.id); }
+  });
+
+  // left text (center mode) — uses b.textLeft
+  const taLeft = document.createElement('div');
+  taLeft.className = 'img-inline-text-left';
+  taLeft.contentEditable = 'true';
+  taLeft.textContent = b.textLeft || '';
+  taLeft.addEventListener('input', () => { b.textLeft = taLeft.textContent; saveNote(); });
+  taLeft.addEventListener('focus', () => { state.lastFocusedId = b.id; });
+  taLeft.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && taLeft.textContent === '') { e.preventDefault(); }
+  });
+
+  // right text (center mode) — uses b.textRight
+  const taRight = document.createElement('div');
+  taRight.className = 'img-inline-text-right';
+  taRight.contentEditable = 'true';
+  taRight.textContent = b.textRight || '';
+  taRight.addEventListener('input', () => { b.textRight = taRight.textContent; saveNote(); });
+  taRight.addEventListener('focus', () => { state.lastFocusedId = b.id; });
+  taRight.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const sel = window.getSelection();
+      if (sel && sel.focusOffset === taRight.textContent.length) { e.preventDefault(); addAfter(b.id, 0); }
+    }
+    if (e.key === 'Backspace' && taRight.textContent === '') { e.preventDefault(); }
+  });
+
+  function applyAlign(align) {
+    const wasCenter = b.align !== align && b.align === 'center';
+    const goingCenter = b.align !== align && align === 'center';
+
+    // leaving center → merge textLeft + textRight into b.text
+    if (wasCenter) {
+      const merged = [b.textLeft, b.textRight].filter(Boolean).join(' ');
+      b.text = merged;
+      ta.textContent = merged;
+    }
+    // entering center → move b.text into textLeft
+    if (goingCenter) {
+      b.textLeft = b.text || '';
+      taLeft.textContent = b.textLeft;
+    }
+
+    inner.className = 'img-block-inner img-align-' + align;
+    const isCenter = align === 'center';
+    if (isCenter) {
+      if (b.widthPx) {
+        cont.style.width = b.widthPx + 'px';
+      } else {
+        cont.style.width = '';
+      }
+    } else {
+      cont.style.width = (b.width || 40) + '%';
+    }
+    ta.style.display      = isCenter ? 'none' : '';
+    taLeft.style.display  = isCenter ? '' : 'none';
+    taRight.style.display = isCenter ? '' : 'none';
+  }
+  applyAlign(b.align);
+
+  inner.appendChild(taLeft);
+  inner.appendChild(cont);
+  inner.appendChild(ta);
+  inner.appendChild(taRight);
+
+  const del = document.createElement('button');
+  del.className = 'block-del'; del.textContent = '✕';
+  del.onclick = () => removeBlock(b.id);
+
+  item.appendChild(handle); item.appendChild(inner); item.appendChild(del);
+  return item;
+}
+
+function makeTxtBlock(b, isFirst) {
+  const item = document.createElement('div');
+  item.className = 'block-item ind-' + Math.min(b.indent, 2); item.dataset.id = b.id;
+
+  const handle = document.createElement('span');
+  handle.className = 'block-handle'; handle.textContent = '⋮⋮';
+
+  const bullet = document.createElement('span');
+  bullet.className = 'block-bullet'; bullet.textContent = b.indent > 0 ? '–' : '·';
+
+  const ta = document.createElement('div');
+  ta.className = 'block-text';
+  ta.contentEditable = 'true';
+  ta.spellcheck = true;
+  if (isFirst) ta.dataset.placeholder = 'Начните писать...';
+  // restore saved html or plain text
+  ta.innerHTML = b.html || (b.text ? escHtml(b.text) : '');
+
+  bullet.addEventListener('click', () => ta.focus());
+
+  ta.addEventListener('input', () => { b.html = ta.innerHTML; b.text = ta.innerText; saveNote(); });
+  ta.addEventListener('focus', () => { state.lastFocusedId = b.id; });
+  ta.addEventListener('keydown', e => {
+    // Alt+B — bold
+    if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      document.execCommand('bold');
+      b.html = ta.innerHTML; b.text = ta.innerText; saveNote();
+      return;
+    }
+    // Alt+N — red mark
+    if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'n') {
+      e.preventDefault();
+      applyRedMark(ta, b);
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addAfter(b.id, b.indent); }
+    if (e.key === 'Tab') { e.preventDefault(); b.indent = e.shiftKey ? Math.max(0, b.indent-1) : Math.min(2, b.indent+1); saveNote(); renderBlocks(); focusBlock(b.id); }
+    if (e.key === 'Backspace' && ta.innerText.trim() === '' && ta.innerHTML.replace(/<br>/g,'').trim() === '') { e.preventDefault(); removeBlock(b.id); }
+  });
+  item.addEventListener('click', e => { if (e.target === item) ta.focus(); });
+
+  const del = document.createElement('button');
+  del.className = 'block-del'; del.textContent = '✕';
+  del.onclick = e => { e.stopPropagation(); removeBlock(b.id); };
+
+  item.appendChild(handle); item.appendChild(bullet); item.appendChild(ta); item.appendChild(del);
+  return item;
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function applyRedMark(ta, b) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+
+  // check if selection is already red → unwrap
+  const ancestor = range.commonAncestorContainer;
+  const parentSpan = ancestor.nodeType === 3 ? ancestor.parentElement : ancestor;
+  if (parentSpan && parentSpan.classList && parentSpan.classList.contains('mark-red') && parentSpan.closest('[data-id]') === ta.closest('[data-id]')) {
+    // unwrap: replace span with its text
+    const text = document.createTextNode(parentSpan.textContent);
+    parentSpan.replaceWith(text);
+  } else {
+    const span = document.createElement('span');
+    span.className = 'mark-red';
+    try { range.surroundContents(span); } catch(err) {
+      // if selection spans multiple nodes, extract and wrap
+      const frag = range.extractContents();
+      span.appendChild(frag);
+      range.insertNode(span);
+    }
+  }
+  b.html = ta.innerHTML; b.text = ta.innerText; saveNote();
+}
+
+function addAfter(id, indent) {
+  const note = getNote(), idx = note.blocks.findIndex(b => b.id === id);
+  const nb = { id: bid(), type: 'text', text: '', indent };
+  note.blocks.splice(idx+1, 0, nb);
+  saveNote(); renderBlocks(); focusBlock(nb.id);
+}
+
+function removeBlock(id) {
+  const note = getNote();
+  if (note.blocks.length <= 1) {
+    if (note.blocks[0].type === 'text') { note.blocks[0].text = ''; renderBlocks(); focusBlock(note.blocks[0].id); }
+    return;
+  }
+  const idx = note.blocks.findIndex(b => b.id === id);
+  note.blocks.splice(idx, 1);
+  if (!note.blocks.length) note.blocks.push({ id: bid(), type: 'text', text: '', indent: 0 });
+  saveNote(); renderBlocks();
+  const prev = note.blocks.slice(0, Math.max(0, idx)).reverse().find(b => b.type === 'text');
+  if (prev) focusBlock(prev.id);
+}
+
+function focusBlock(id) {
+  setTimeout(() => {
+    const el = document.querySelector(`[data-id="${id}"] .block-text`);
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+  }, 20);
+}
+</script>
+</body>
+</html>
